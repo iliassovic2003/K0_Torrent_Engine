@@ -3,7 +3,7 @@
 PeerId generate_peer_id() {
     PeerId id;
 
-    const char* myPrefix = "-KU0100-";  // better to manual update it each changelog version
+    const char* myPrefix = "-KU0500-";  // better to manual update it each changelog version
 
     std::memcpy(id.data(), myPrefix, 8);
 

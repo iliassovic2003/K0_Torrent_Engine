@@ -1,80 +1,110 @@
 #include "../include/torrent/metainfo.hpp"
 #include "../include/torrent/torrent_file.hpp"
-
 #include <cassert>
 #include <iostream>
 #include <fstream>
+#include <array>
+#include <cstdint>
 
 static void pass(const char* name) {
     std::cout << "  [PASS] " << name << "\n";
 }
 
-static void write_test_torrent_single(const std::string& path) {
+// ── builders ──────────────────────────────────────────────────────────────────
+
+static std::string build_single() {
     std::string pieces(40, '\x01');
-    std::string torrent =
-        "d"
-            "8:announce"
-            "30:udp://tracker.example.com:80"
-            "4:info"
-            "d"
-                "6:lengthi1048576e"
-                "4:name8:test.iso"
-                "12:piece lengthi524288e"
-                "6:pieces40:" + pieces +
-            "e"
-        "e";
+
+    std::string announce    = "udp://tracker.example.com:1337";
+    std::string announce_len = std::to_string(announce.size());
+
+    std::string info = "d";
+    info += "6:lengthi1048576e";
+    info += "4:name8:test.iso";
+    info += "12:piece lengthi524288e";
+    info += "6:pieces40:";
+    info += pieces;
+    info += "e";
+
+    std::string torrent = "d";
+    torrent += "8:announce";
+    torrent += announce_len + ":" + announce;
+    torrent += "4:info";
+    torrent += info;
+    torrent += "e";
+    return torrent;
+}
+
+static std::string build_multi() {
+    std::string pieces(20, '\x02');
+    std::string announce     = "udp://tracker.example.com:1337";
+    std::string announce_len = std::to_string(announce.size());
+
+    std::string info = "d";
+    info += "5:filesl";
+    info += "d";
+    info += "6:lengthi512000e";
+    info += "4:pathl6:folder8:file.txte";
+    info += "e";
+    info += "d";
+    info += "6:lengthi256000e";
+    info += "4:pathl6:folder9:other.txte";
+    info += "e";
+    info += "e";
+    info += "4:name10:test-multi";
+    info += "12:piece lengthi524288e";
+    info += "6:pieces20:";
+    info += pieces;
+    info += "e";
+
+    std::string torrent = "d";
+    torrent += "8:announce";
+    torrent += announce_len + ":" + announce;
+    torrent += "4:info";
+    torrent += info;
+    torrent += "e";
+    return torrent;
+}
+
+static std::string build_missing_name() {
+    std::string pieces(20, '\x01');
+    std::string announce     = "udp://tracker.example.com:1337";
+    std::string announce_len = std::to_string(announce.size());
+
+    std::string info = "d";
+    info += "6:lengthi1048576e";
+    info += "12:piece lengthi524288e";
+    info += "6:pieces20:";
+    info += pieces;
+    info += "e";
+
+    std::string torrent = "d";
+    torrent += "8:announce";
+    torrent += announce_len + ":" + announce;
+    torrent += "4:info";
+    torrent += info;
+    torrent += "e";
+    return torrent;
+}
+
+// ── writers ───────────────────────────────────────────────────────────────────
+
+static void write_test_torrent_single(const std::string& path) {
     std::ofstream f(path, std::ios::binary);
-    f << torrent;
+    f << build_single();
 }
 
 static void write_test_torrent_multi(const std::string& path) {
-    std::string pieces(20, '\x02');
-    std::string torrent =
-        "d"
-            "8:announce"
-            "30:udp://tracker.example.com:80"
-            "4:info"
-            "d"
-                "5:filesl"
-                    "d"
-                        "6:lengthi512000e"
-                        "4:pathl"
-                            "6:folder"
-                            "8:file.txte"
-                    "e"
-                    "d"
-                        "6:lengthi256000e"
-                        "4:pathl"
-                            "6:folder"
-                            "9:other.txte"
-                    "e"
-                "e"
-                "4:name10:test-multi"
-                "12:piece lengthi524288e"
-                "6:pieces20:" + pieces +
-            "e"
-        "e";
     std::ofstream f(path, std::ios::binary);
-    f << torrent;
+    f << build_multi();
 }
 
 static void write_test_torrent_missing_name(const std::string& path) {
-    std::string pieces(20, '\x01');
-    std::string torrent =
-        "d"
-            "8:announce"
-            "30:udp://tracker.example.com:80"
-            "4:info"
-            "d"
-                "6:lengthi1048576e"
-                "12:piece lengthi524288e"
-                "6:pieces20:" + pieces +
-            "e"
-        "e";
     std::ofstream f(path, std::ios::binary);
-    f << torrent;
+    f << build_missing_name();
 }
 
+// ── single file ───────────────────────────────────────────────────────────────
 
 static void test_single_file_name() {
     write_test_torrent_single("/tmp/kw_test_single.torrent");
@@ -107,7 +137,7 @@ static void test_single_file_piece_count() {
 static void test_single_file_announce() {
     write_test_torrent_single("/tmp/kw_test_single.torrent");
     auto tf = parse_torrent("/tmp/kw_test_single.torrent");
-    assert(tf.announce == "udp://tracker.example.com:80");
+    assert(tf.announce == "udp://tracker.example.com:1337");
     pass("single file announce");
 }
 
@@ -141,6 +171,7 @@ static void test_single_file_piece_hash_size() {
     pass("single file piece hash size");
 }
 
+// ── multi file ────────────────────────────────────────────────────────────────
 
 static void test_multi_file_is_multi() {
     write_test_torrent_multi("/tmp/kw_test_multi.torrent");
@@ -187,6 +218,7 @@ static void test_multi_file_name() {
     pass("multi file name");
 }
 
+// ── error handling ────────────────────────────────────────────────────────────
 
 static void test_missing_file_throws() {
     bool caught = false;
@@ -215,6 +247,7 @@ static void test_empty_file_throws() {
     pass("empty file throws");
 }
 
+// ── main ─────────────────────────────────────────────────────────────────────
 
 int main() {
     std::cout << "───> running test_metainfo\n\n";
