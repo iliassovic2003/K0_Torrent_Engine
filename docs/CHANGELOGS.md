@@ -1,81 +1,177 @@
-## v0.5
-    corrected the test_metadata file.
+════════════════════════════════════════════════════════════════
+                    K0_TORRENT — CHANGELOG
+════════════════════════════════════════════════════════════════
+
+────────────────────────────────────────────────────────────────
+  v0.0.0 => v0.1.0                                      [MAJOR]
+────────────────────────────────────────────────────────────────
+  + Initial project scaffold
+      - Created the initial repository structure
+      - Added documentation directory:
+          docs/
+      - Added header directory structure:
+          include/bencode/
+          include/crypto/
+          include/dht/
+          include/io/
+          include/net/
+          include/peer/
+          include/piece/
+          include/session/
+          include/torrent/
+          include/tracker/
+      - Added the initial `Makefile`
+      - Added placeholder files for future torrent-client modules
+      - Established the foundation for bencode decoding,
+        torrent metadata parsing, peer communication, and tracking
 
 
-## v0.4
+────────────────────────────────────────────────────────────────
+  v0.1.0 => v0.2.0                                      [MAJOR]
+────────────────────────────────────────────────────────────────
+  + Full bencode decoding support
+      - Added integer decoding
+      - Added string decoding
+      - Added list decoding
+      - Added dictionary decoding
+      - Added nested bencode value support
 
-#### Added
-- Build/test automation via `Makefile`:
-  - `test_sha1`
-  - `test_bencode`
-  - `test_metainfo`
-  - `clean`
-- `.gitignore` entry for build artifacts (`/bin`).
-- SHA1 test suite in `tests/test_sha1.cpp`:
-  - Known SHA1 vectors
-  - Raw digest vs hex consistency
-  - Binary/null-byte input handling
-  - Hex output format checks
-- Metainfo parser test suite in `tests/test_metainfo.cpp`:
-  - Single-file and multi-file torrent parsing
-  - Piece and size validations
-  - Error-path coverage
+  + Bencode data model
+      - Added the `BencodeValue` variant type
+      - Added typed accessors for decoded values
+      - Added support for checking and retrieving stored value types
 
-#### Fixed
-- `sha1_hex()` iteration variable bug in `srcs/crypto/sha1.cpp` (`digest` -> `result`).
-- Missing crypto-related includes in SHA1/PeerID headers for build correctness.
+  + Decoder error handling
+      - Added robust handling for malformed input
+      - Added unterminated value detection
+      - Added invalid input validation
+      - Added type mismatch error handling
+      - Added offset tracking during decoding
+      - Added decoder re-entry support from tracked offsets
 
-#### Changed
-- Minor formatting/log output improvements in tests and parser code.
+  + Bencode test coverage
+      - Added `tests/test_bencode.cpp`
+      - Added positive parsing tests
+      - Added nested structure tests
+      - Added offset tracking and re-entry tests
+      - Added invalid input tests
+      - Added type mismatch tests
 
 
----
-## v0.3
+────────────────────────────────────────────────────────────────
+  v0.2.0 => v0.3.0                                      [MAJOR]
+────────────────────────────────────────────────────────────────
+  + Torrent metainfo domain models
+      - Added `TorrentFile`
+      - Added `FileInfo`
+      - Added `MetainfoError`
+      - Added support for representing single-file torrents
+      - Added support for representing multi-file torrents
 
-#### Added
-- Torrent metainfo domain models:
-  - `TorrentFile`
-  - `FileInfo`
-  - `MetainfoError`
-- Torrent metadata parser (`parse_torrent`) in `srcs/torrent/metainfo.cpp`:
-  - Reads and decodes `.torrent` files
-  - Extracts tracker/comment/creator/date metadata
-  - Supports single-file and multi-file torrents
-  - Parses piece hashes into 20-byte SHA1 blocks
-  - Computes `info_hash` from raw bencoded `info` dictionary bytes
-- SHA1 utility module:
-  - `sha1_raw(const std::string&)`
-  - `sha1_hex(const std::string&)`
-- Peer ID utility:
-  - `generate_peer_id()`
-- `TorrentFile` helpers:
-  - `is_multi_file()`
-  - `piece_count()`
-  - `total_size()`
+  + Torrent metadata parser
+      - Added `parse_torrent` in:
+          `srcs/torrent/metainfo.cpp`
+      - Added `.torrent` file reading and decoding
+      - Added tracker metadata extraction
+      - Added comment metadata extraction
+      - Added creator metadata extraction
+      - Added creation-date metadata extraction
+      - Added single-file torrent parsing
+      - Added multi-file torrent parsing
+      - Added piece hash parsing into 20-byte SHA1 blocks
+      - Added `info_hash` calculation from the raw bencoded
+        `info` dictionary bytes
 
----
-## v0.2
+  + SHA1 utility module
+      - Added `sha1_raw(const std::string&)`
+      - Added `sha1_hex(const std::string&)`
+      - Added raw SHA1 digest generation
+      - Added hexadecimal SHA1 digest generation
 
-#### Added
-- Full bencode decoding support:
-  - Integers
-  - Strings
-  - Lists
-  - Dictionaries
-- `BencodeValue` variant type with typed accessors.
-- Robust decode error handling for malformed/unterminated input.
-- Comprehensive bencode test suite (`tests/test_bencode.cpp`):
-  - Positive parsing scenarios
-  - Nested structures
-  - Offset tracking/re-entry behavior
-  - Type mismatch and invalid input checks
+  + Peer ID utility
+      - Added `generate_peer_id()`
+      - Added initial peer identity generation support
 
----
-## v0.1
+  + TorrentFile helper methods
+      - Added `is_multi_file()`
+      - Added `piece_count()`
+      - Added `total_size()`
 
-### Added
-- Initial repository scaffold.
-- Base project structure and placeholder files under:
-  - `docs/`
-  - `include/` (bencode, crypto, dht, io, net, peer, piece, session, torrent, tracker)
-  - `Makefile`
+
+────────────────────────────────────────────────────────────────
+  v0.3.0 => v0.4.0                                      [MINOR]
+────────────────────────────────────────────────────────────────
+  + Build and test automation
+      - Expanded the `Makefile` with:
+          `test_sha1`
+          `test_bencode`
+          `test_metainfo`
+          `clean`
+
+  + SHA1 test suite
+      - Added `tests/test_sha1.cpp`
+      - Added known SHA1 test vectors
+      - Added raw digest versus hexadecimal digest consistency tests
+      - Added binary input handling tests
+      - Added null-byte input tests
+      - Added hexadecimal output format validation
+
+  + Metainfo parser test suite
+      - Added `tests/test_metainfo.cpp`
+      - Added single-file torrent parsing tests
+      - Added multi-file torrent parsing tests
+      - Added piece validation tests
+      - Added total-size validation tests
+      - Added parser error-path tests
+
+  + Repository hygiene
+      - Added `/bin` to `.gitignore`
+      - Added protection against committing build artifacts
+
+  / SHA1 implementation fixes
+      - Fixed the `sha1_hex()` iteration variable bug in:
+          `srcs/crypto/sha1.cpp`
+      - Replaced the incorrect `digest` variable with `result`
+
+  / Header and build fixes
+      - Added missing crypto-related includes
+      - Fixed SHA1 header compilation dependencies
+      - Fixed PeerID header compilation dependencies
+
+  · Test and parser cleanup
+      - Improved test formatting
+      - Improved test log output
+      - Applied minor parser readability improvements
+
+
+────────────────────────────────────────────────────────────────
+  v0.4.0 => v0.5.0                                      [MINOR]
+────────────────────────────────────────────────────────────────
+  + Test metadata maintenance
+      - Corrected the test metadata file
+      - Synchronized test metadata with the current test structure
+      - Updated repository testing information for future development
+
+
+────────────────────────────────────────────────────────────────
+  v0.5.0 => v0.6.0                                      [MINOR]
+────────────────────────────────────────────────────────────────
+  + Test configuration correction
+      - Corrected the test metadata file
+      - Refined the metadata used by the repository test workflow
+      - Ensured the test configuration reflects the current project state
+
+
+════════════════════════════════════════════════════════════════
+                        CURRENT RELEASE
+════════════════════════════════════════════════════════════════
+
+  BUILD STATUS:     ✅ BENCODE + TORRENT METAINFO + SHA1 TESTS
+  VERSION:          v0.6
+  RELEASE DATE:     September 21, 2026
+  FOCUS:            Test metadata correction and continued validation
+                    of the bencode, SHA1, and torrent metainfo modules
+
+════════════════════════════════════════════════════════════════
+  Legend:  + Added          · Changed             / Fixed
+════════════════════════════════════════════════════════════════
