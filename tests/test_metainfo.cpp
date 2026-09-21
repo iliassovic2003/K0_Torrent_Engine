@@ -11,7 +11,6 @@ static void pass(const char* name) {
 }
 
 // ── builders ──────────────────────────────────────────────────────────────────
-
 static std::string build_single() {
     std::string pieces(40, '\x01');
 
