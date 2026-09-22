@@ -62,9 +62,6 @@ private:
     uint16_t          port_;
     int32_t           min_interval_ = 1800;
 
-    // Factory: pick HttpTracker or UdpTracker based on URL scheme.
-    static std::unique_ptr<Tracker> make_tracker(const std::string& url);
-
-    // Try announcing to a single tier; returns peers on first success.
-    std::vector<PeerAddress> try_tier(Tier& tier, const TrackerRequest& req);
+    static std::unique_ptr<Tracker>     make_tracker(const std::string& url);
+    std::vector<PeerAddress>            try_tier(Tier& tier, const TrackerRequest& req);
 };
