@@ -2,6 +2,7 @@
 
 #include "../common/types.hpp"
 # include <vector>
+# include <cstddef>
 # include <cstdint>
 
 class Peer {

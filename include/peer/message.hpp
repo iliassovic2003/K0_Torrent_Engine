@@ -21,6 +21,8 @@ struct PeerMessage {
     MessageId               id;
     std::vector<uint8_t>    payload;
 
+    PeerMessage() : id(MessageId::Choke) {}
+
     PeerMessage(MessageId id, std::vector<uint8_t> payload = {})
         : id(id), payload(std::move(payload)) {}
 

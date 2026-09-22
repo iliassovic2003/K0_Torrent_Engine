@@ -15,6 +15,7 @@ struct Handshake {
     InfoHash                        info_hash;
     PeerId                          peer_id;
 
+    Handshake() = default;
     Handshake(const InfoHash& ih, const PeerId& pid);
 
     std::array<uint8_t, HANDSHAKE_SIZE> serialize() const;

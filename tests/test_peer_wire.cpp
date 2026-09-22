@@ -32,7 +32,7 @@ static void test_message_framing() {
     auto wire_data = msg.serialize();
     
     assert(wire_data.size() == 4 + 5); 
-    assert(wire_data[3] == 5)
+    assert(wire_data[3] == 5);
     assert(wire_data[4] == 4);
 
     std::vector<uint8_t> buffer_sim(wire_data.begin(), wire_data.begin() + 3);
