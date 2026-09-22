@@ -51,7 +51,10 @@ void TcpSocket::connect(const std::string& host, uint16_t port)
         if (sock == -1)
             continue;
 
-        if (::connect(sock, ai->ai_addr, ai->ai_addrlen) == 0)
+        int flags = ::fcntl(sock, F_GETFL, 0);
+        ::fcntl(sock, F_SETFL, flags | O_NONBLOCK);
+
+        if (::connect(sock, ai->ai_addr, ai->ai_addrlen) == 0 || errno == EINPROGRESS)
             break;
 
         ::close(sock);
@@ -64,7 +67,6 @@ void TcpSocket::connect(const std::string& host, uint16_t port)
 
     fd_ = sock;
 }
-
 
 void TcpSocket::close()
 {

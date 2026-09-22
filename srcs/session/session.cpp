@@ -15,7 +15,7 @@ Session::Session(const std::string& torrent_path)
     my_peer_id_   = generate_peer_id();
 
     tracker_mgr_ = std::make_unique<TrackerManager>(torrent_info_.announce_list, my_peer_id_, listen_port_);
-    disk_mgr_    = std::make_unique<DiskManager>(torrent_info_, "./downloads");
+    disk_mgr_    = std::make_unique<DiskManager>(torrent_info_, "downloads");
     piece_mgr_   = std::make_unique<PieceManager>(torrent_info_);
 }
 
@@ -78,25 +78,26 @@ void Session::request_next_blocks(std::shared_ptr<PeerConnection> connection) {
     for (int i = 0; i < 5; ++i) {
         auto req = piece_mgr_->create_next_request(*connection->get_peer());
         
-        if (req)
+        if (req) {
             connection->queue_message(*req);
-        else
+        } else {
             break;
+        }
     }
 }
 
 void Session::on_peer_message(std::shared_ptr<PeerConnection> connection, PeerMessage msg) {
     switch (msg.id) {
         case MessageId::Choke:
-            LOG_I(TAG, "Peer choked us");
             connection->get_peer()->peer_choking = true;
             break;
             
-        case MessageId::Unchoke:
-            LOG_I(TAG, "Peer UNCHOKED us! Requesting data...");
-            connection->get_peer()->peer_choking = false;
+        case MessageId::Unchoke: {
+            auto peer = connection->get_peer();
+            peer->peer_choking = false;
             request_next_blocks(connection);
             break;
+        }
             
         case MessageId::Interested:
             connection->get_peer()->peer_interested = true;
@@ -119,15 +120,12 @@ void Session::on_peer_message(std::shared_ptr<PeerConnection> connection, PeerMe
             }
             break;
             
-        case MessageId::Bitfield:
-            LOG_I(TAG, "Received Bitfield from peer");
-            connection->get_peer()->bitfield = msg.payload;
-            
-            if (!msg.payload.empty()) {
-                connection->get_peer()->am_interested = true;
-                connection->queue_message(PeerMessage(MessageId::Interested));
-            }
+        case MessageId::Bitfield: {
+            auto peer = connection->get_peer();
+            peer->bitfield = msg.payload;
+            connection->queue_message(PeerMessage(MessageId::Interested, {}));
             break;
+        }
             
         case MessageId::Piece: {
             if (msg.payload.size() <= 8) break;
@@ -138,18 +136,15 @@ void Session::on_peer_message(std::shared_ptr<PeerConnection> connection, PeerMe
                              (msg.payload[6] << 8)  | msg.payload[7];
             
             std::vector<uint8_t> block_data(msg.payload.begin() + 8, msg.payload.end());
+            
+            try {
+                disk_mgr_->write_block(index, begin, block_data);
+            } catch (const std::exception& e) {
+                LOG_E(TAG, "Disk write failed for piece %u, offset %u: %s", index, begin, e.what());
+            }
 
-            bool piece_finished = piece_mgr_->process_block(index, begin, block_data);
-
-            if (piece_finished) {
-                std::vector<uint8_t> full_piece = piece_mgr_->get_completed_piece(index);
-                
-                try {
-                    disk_mgr_->write_block(index, 0, full_piece);
-                    LOG_I(TAG, "Successfully wrote Piece %u to disk!", index);
-                } catch (const std::exception& e) {
-                    LOG_E(TAG, "Disk write failed: %s", e.what());
-                }
+            if (piece_mgr_->process_block(index, begin, block_data)) {
+                LOG_I(TAG, "Piece %u downloaded and successfully verified!", index);
             }
 
             request_next_blocks(connection);

@@ -14,6 +14,7 @@ void handle_sigint(int signum) {
     if (g_session) {
         g_session->stop();
     }
+    std::_Exit(0);
 }
 
 int main(int argc, char** argv) {

@@ -3,6 +3,8 @@
 #include "../../include/common/logger.hpp"
 #include <arpa/inet.h>
 #include <sys/poll.h>
+#include <cerrno>
+#include <cstring>
 
 static constexpr const char* TAG = "K0_PeerConn";
 
@@ -24,9 +26,15 @@ PeerConnection::~PeerConnection() {
 void PeerConnection::start() {
     try {
         std::string ip_str = ip_to_string(peer_->address.ip);
-        socket_.connect(ip_str, peer_->address.port);
         
-        socket_.set_nonblocking(true);
+        try {
+            socket_.connect(ip_str, peer_->address.port);
+        } catch (const std::exception& e) {
+            std::string err_msg = e.what();
+            if (err_msg.find("Operation now in progress") == std::string::npos && 
+                err_msg.find("EINPROGRESS") == std::string::npos)
+                throw; 
+        }
 
         std::weak_ptr<PeerConnection> weak_self = shared_from_this();
         loop_.add(socket_.fd(), POLLIN | POLLOUT, [weak_self](int /*fd*/, uint32_t events) {
@@ -41,7 +49,8 @@ void PeerConnection::start() {
         state_ = ConnectionState::HandshakeSent;
 
     } catch (const std::exception& e) {
-        LOG_W(TAG, "Failed to start connection: %s", e.what());
+        LOG_W(TAG, "Failed to start connection to %s: %s", 
+              ip_to_string(peer_->address.ip).c_str(), e.what());
         disconnect();
     }
 }
@@ -93,27 +102,40 @@ void PeerConnection::handle_write() {
 }
 
 void PeerConnection::handle_read() {
-    auto data = socket_.recv(4096);
-    if (data.empty())
-        return;
-
-    read_buffer_.insert(read_buffer_.end(), data.begin(), data.end());
-
-    if (state_ == ConnectionState::HandshakeSent)
-        if (!process_handshake())
+    try {
+        auto data = socket_.recv(4096);
+        
+        if (data.empty()) {
             return;
-
-    if (state_ == ConnectionState::Connected) {
-        while (true) {
-            ParseResult result = parse_peer_message(read_buffer_);
-            if (!result.complete)
-                break;
-
-            if (!result.is_keep_alive && message_handler_) 
-                message_handler_(shared_from_this(), std::move(result.message));
-
-            read_buffer_.erase(read_buffer_.begin(), read_buffer_.begin() + result.consumed_bytes);
         }
+
+        read_buffer_.insert(read_buffer_.end(), data.begin(), data.end());
+
+        if (state_ == ConnectionState::HandshakeSent)
+            if (!process_handshake())
+                return;
+
+        if (state_ == ConnectionState::Connected) {
+            while (true) {
+                ParseResult result = parse_peer_message(read_buffer_);
+                if (!result.complete)
+                    break;
+
+                if (!result.is_keep_alive && message_handler_) 
+                    message_handler_(shared_from_this(), std::move(result.message));
+
+                read_buffer_.erase(read_buffer_.begin(), read_buffer_.begin() + result.consumed_bytes);
+            }
+        }
+    } catch (const std::exception& e) {
+        std::string err_msg = e.what();
+
+        if (err_msg.find("closed by peer") != std::string::npos)
+            LOG_I(TAG, "Peer closed connection cleanly (EOF)");
+        else
+            LOG_W(TAG, "Read error: %s", err_msg.c_str());
+        
+        disconnect();
     }
 }
 
@@ -134,7 +156,7 @@ bool PeerConnection::process_handshake() {
         peer_->id_set = true;
         state_ = ConnectionState::Connected;
         
-        LOG_I(TAG, "Handshake successful with peer!");
+        LOG_I(TAG, "TCP connection ESTABLISHED and Handshake successful with peer!");
 
         read_buffer_.erase(read_buffer_.begin(), read_buffer_.begin() + Handshake::HANDSHAKE_SIZE);
         return true;

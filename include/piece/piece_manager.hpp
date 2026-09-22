@@ -6,6 +6,7 @@
 #include "../peer/message.hpp"
 #include "../crypto/sha1.hpp"
 #include <unordered_map>
+#include <unordered_set>
 #include <memory>
 
 struct ActivePiece {
