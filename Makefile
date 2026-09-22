@@ -7,16 +7,24 @@ TEST_DIR := tests
 BIN_DIR  := bin
 
 
-CRYPTO_SRC := $(SRC_DIR)/crypto/sha1.cpp \
-              $(SRC_DIR)/crypto/peer_id.cpp
+CRYPTO_SRC 	:= $(SRC_DIR)/crypto/sha1.cpp \
+              	$(SRC_DIR)/crypto/peer_id.cpp
 
 TORRENT_SRC := $(SRC_DIR)/torrent/metainfo.cpp \
-               $(SRC_DIR)/torrent/torrent_file.cpp
+               	$(SRC_DIR)/torrent/torrent_file.cpp
 
 BENCODE_SRC := $(SRC_DIR)/bencode/bencode.cpp
 
+NET_SRC 	:= $(SRC_DIR)/net/event_loop.cpp \
+           		$(SRC_DIR)/net/tcp_socket.cpp \
+           		$(SRC_DIR)/net/udp_socket.cpp
 
-all: test_sha1 test_bencode test_metainfo
+TRACKER_SRC := $(SRC_DIR)/tracker/http_tracker.cpp \
+               	$(SRC_DIR)/tracker/tracker.cpp \
+               	$(SRC_DIR)/tracker/tracker_manager.cpp \
+               	$(SRC_DIR)/tracker/udp_tracker.cpp
+
+all: test_sha1 test_bencode test_metainfo test_tracker
 
 $(BIN_DIR):
 	mkdir -p $(BIN_DIR)
@@ -33,7 +41,13 @@ test_metainfo: $(BIN_DIR)
 	@$(CXX) $(CXXFLAGS) $(TEST_DIR)/test_metainfo.cpp $(BENCODE_SRC) $(CRYPTO_SRC) $(TORRENT_SRC) -o $(BIN_DIR)/test_metainfo $(LDFLAGS)
 	@./$(BIN_DIR)/test_metainfo
 
+test_tracker: $(BIN_DIR)
+	@$(CXX) $(CXXFLAGS) $(TEST_DIR)/test_tracker.cpp \
+		$(TRACKER_SRC) $(NET_SRC) $(TORRENT_SRC) $(BENCODE_SRC) $(CRYPTO_SRC) \
+		-o $(BIN_DIR)/test_tracker $(LDFLAGS)
+	@./$(BIN_DIR)/test_tracker
+
 clean:
 	@rm -rf $(BIN_DIR)
 
-.PHONY: all clean test_sha1 test_bencode test_metainfo
+.PHONY: all clean test_sha1 test_bencode test_metainfo test_tracker

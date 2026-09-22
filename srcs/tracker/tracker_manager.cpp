@@ -4,11 +4,10 @@
 #include "../../include/common/error.hpp"
 #include "../../include/common/logger.hpp"
 
-static constexpr const char* TAG = "K0_TrackerMgr";
+static constexpr const char* TAG = "K0_0TrackerMgr";
 
 using Clock = std::chrono::steady_clock;
 
-// ── TierEntry ─────────────────────────────────────────────────────────────────
 bool TrackerManager::TierEntry::is_due() const {
     return Clock::now() >= next_announce;
 }
@@ -18,7 +17,6 @@ Tracker* TrackerManager::TierEntry::get_tracker() {
     return tracker.get();
 }
 
-// ── Factory ───────────────────────────────────────────────────────────────────
 std::unique_ptr<Tracker> TrackerManager::make_tracker(const std::string& url) {
     if (url.substr(0, 4) == "udp:")
         return std::make_unique<UdpTracker>(url);
@@ -27,7 +25,6 @@ std::unique_ptr<Tracker> TrackerManager::make_tracker(const std::string& url) {
     throw TrackerError("Unsupported tracker scheme: " + url);
 }
 
-// ── Ctor ──────────────────────────────────────────────────────────────────────
 TrackerManager::TrackerManager(std::vector<std::vector<std::string>> announce_list,
                                PeerId peer_id,
                                uint16_t port)
@@ -47,7 +44,6 @@ TrackerManager::TrackerManager(std::vector<std::vector<std::string>> announce_li
     }
 }
 
-// ── try_tier ──────────────────────────────────────────────────────────────────
 std::vector<PeerAddress> TrackerManager::try_tier(Tier& tier,
                                                    const TrackerRequest& req)
 {
@@ -81,7 +77,6 @@ std::vector<PeerAddress> TrackerManager::try_tier(Tier& tier,
     return {};
 }
 
-// ── announce ─────────────────────────────────────────────────────────────────
 
 std::vector<PeerAddress> TrackerManager::announce(const InfoHash& info_hash,
                                                    int64_t left,
@@ -115,7 +110,6 @@ std::vector<PeerAddress> TrackerManager::announce(const InfoHash& info_hash,
     return all_peers;
 }
 
-// ── reannounce_if_due ────────────────────────────────────────────────────────
 std::vector<PeerAddress> TrackerManager::reannounce_if_due(const InfoHash& info_hash,
                                                             int64_t downloaded,
                                                             int64_t uploaded,
@@ -148,7 +142,6 @@ std::vector<PeerAddress> TrackerManager::reannounce_if_due(const InfoHash& info_
     return all_peers;
 }
 
-// ── stop ─────────────────────────────────────────────────────────────────────
 void TrackerManager::stop(const InfoHash& info_hash,
                            int64_t downloaded,
                            int64_t uploaded)

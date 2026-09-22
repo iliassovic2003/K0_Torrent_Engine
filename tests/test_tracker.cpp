@@ -6,12 +6,12 @@
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 static void test_url_encode() {
-    k0::InfoHash h{};
+    InfoHash h{};
     for (uint8_t i = 0; i < 20; ++i)
         h[i] = i;
 
-    std::string encoded = k0::url_encode_hash(h);
-    assert(encoded.size() == 60);           // 20 bytes × 3 chars (%XX)
+    std::string encoded = url_encode_hash(h);
+    assert(encoded.size() == 60);
     assert(encoded.substr(0, 3) == "%00");
     assert(encoded.substr(3, 3) == "%01");
     assert(encoded.substr(57, 3) == "%13");
@@ -20,13 +20,13 @@ static void test_url_encode() {
 
 static void test_url_encode_printable() {
     uint8_t raw[4] = { 0xFF, 0x00, 0xAB, 0xCD };
-    std::string enc = k0::url_encode(raw, 4);
+    std::string enc = url_encode(raw, 4);
     assert(enc == "%ff%00%ab%cd");
     std::cout << "  [PASS] url_encode_printable\n";
 }
 
 static void test_tracker_manager_construction() {
-    k0::PeerId pid{};
+    PeerId pid{};
     pid[0] = '-'; pid[1] = 'K'; pid[2] = '0';
 
     std::vector<std::vector<std::string>> tiers = {
@@ -35,18 +35,11 @@ static void test_tracker_manager_construction() {
           "udp://tracker.example2.com:6969/announce" }
     };
 
-    // Just check construction doesn't throw
-    k0::TrackerManager mgr(tiers, pid, 6881);
+    TrackerManager mgr(tiers, pid, 6881);
     std::cout << "  [PASS] TrackerManager construction\n";
 }
 
-// ── compact peer list parsing ─────────────────────────────────────────────────
-// We test HttpTracker's parse path indirectly by constructing a raw body that
-// looks like a valid tracker response and decoding it manually.
 static void test_compact_peer_decode() {
-    // Build a 12-byte compact peer list: two IPv4 peers
-    // Peer 1: 127.0.0.1:6881
-    // Peer 2: 192.168.1.100:51413
     uint8_t raw[12];
 
     // peer 1
@@ -94,15 +87,13 @@ static void test_udp_connect_packet_layout() {
 
     wu64(buf,     MAGIC);
     wu32(buf + 8, 0);
-    wu32(buf + 12, 0xDEADBEEF); // txn_id
+    wu32(buf + 12, 0xDEADBEEF);
 
-    // Verify magic bytes
     uint64_t magic_read = 0;
     for (int i = 0; i < 8; ++i)
         magic_read = (magic_read << 8) | buf[i];
     assert(magic_read == MAGIC);
 
-    // Verify action
     uint32_t action = ((uint32_t)buf[8]<<24)|((uint32_t)buf[9]<<16)
                      |((uint32_t)buf[10]<<8)|(uint32_t)buf[11];
     assert(action == 0);

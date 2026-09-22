@@ -26,65 +26,59 @@
 #include <cstdio>
 #include <iostream>
 
-namespace k0 {
+// ── Tracker request ───────────────────────────────────────────────────────────
+enum class TrackerEvent : int32_t {
+    None      = 0,
+    Completed = 1,
+    Started   = 2,
+    Stopped   = 3,
+};
 
-    // ── Tracker request ───────────────────────────────────────────────────────────
+struct TrackerRequest {
+    InfoHash    info_hash;
+    PeerId      peer_id;
+    uint16_t    port        = 6881;
+    int64_t     uploaded    = 0;
+    int64_t     downloaded  = 0;
+    int64_t     left        = 0;
+    TrackerEvent event      = TrackerEvent::Started;
+    int32_t     num_want    = 50;
+    bool        compact     = true;
+};
 
-    enum class TrackerEvent : int32_t {
-        None      = 0,
-        Completed = 1,
-        Started   = 2,
-        Stopped   = 3,
-    };
+// ── Tracker response ──────────────────────────────────────────────────────────
 
-    struct TrackerRequest {
-        InfoHash    info_hash;
-        PeerId      peer_id;
-        uint16_t    port        = 6881;
-        int64_t     uploaded    = 0;
-        int64_t     downloaded  = 0;
-        int64_t     left        = 0;
-        TrackerEvent event      = TrackerEvent::Started;
-        int32_t     num_want    = 50;
-        bool        compact     = true;
-    };
+struct TrackerResponse {
+    int32_t                 interval     = 1800;
+    int32_t                 min_interval = 0;
+    int32_t                 complete     = 0;
+    int32_t                 incomplete   = 0;
+    std::vector<PeerAddress> peers;
+    std::string             warning;
+};
 
-    // ── Tracker response ──────────────────────────────────────────────────────────
+// ── Abstract tracker base ─────────────────────────────────────────────────────
 
-    struct TrackerResponse {
-        int32_t                 interval     = 1800;
-        int32_t                 min_interval = 0;
-        int32_t                 complete     = 0;
-        int32_t                 incomplete   = 0;
-        std::vector<PeerAddress> peers;
-        std::string             warning;
-    };
+class Tracker {
+public:
+    virtual ~Tracker() = default;
 
-    // ── Abstract tracker base ─────────────────────────────────────────────────────
+    virtual TrackerResponse announce(const TrackerRequest& req) = 0;
 
-    class Tracker {
-    public:
-        virtual ~Tracker() = default;
+    virtual void scrape(const InfoHash& /*info_hash*/,
+                        int32_t& /*seeders*/,
+                        int32_t& /*leechers*/,
+                        int32_t& /*completed*/) {
+        throw TrackerError("Scrape not supported by this tracker");
+    }
 
-        // Synchronous announce — blocks until the tracker responds or times out.
-        virtual TrackerResponse announce(const TrackerRequest& req) = 0;
+    const std::string& url() const { return url_; }
 
-        virtual void scrape(const InfoHash& /*info_hash*/,
-                            int32_t& /*seeders*/,
-                            int32_t& /*leechers*/,
-                            int32_t& /*completed*/) {
-            throw TrackerError("Scrape not supported by this tracker");
-        }
+protected:
+    explicit Tracker(std::string url) : url_(std::move(url)) {}
+    std::string url_;
+};
 
-        const std::string& url() const { return url_; }
-
-    protected:
-        explicit Tracker(std::string url) : url_(std::move(url)) {}
-        std::string url_;
-    };
-
-    std::string url_encode(const uint8_t* data, size_t len);
-    std::string url_encode_hash(const InfoHash& h);
-    std::string url_encode_peer_id(const PeerId& id);
-
-}
+std::string url_encode(const uint8_t* data, size_t len);
+std::string url_encode_hash(const InfoHash& h);
+std::string url_encode_peer_id(const PeerId& id);
