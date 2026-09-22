@@ -31,7 +31,7 @@ class TcpSocket {
         void connect(const std::string& host, uint16_t port);
         void close();
 
-        void                  send(const std::vector<uint8_t>& data);
+        size_t                send(const uint8_t* data, size_t size);
         std::vector<uint8_t>  recv(size_t max_bytes);
 
         void set_nonblocking(bool on);

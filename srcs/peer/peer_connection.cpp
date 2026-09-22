@@ -1,111 +1,145 @@
 #include "../../include/peer/peer_connection.hpp"
 #include "../../include/common/error.hpp"
 #include "../../include/common/logger.hpp"
-#include <sys/socket.h>
-#include <netinet/in.h>
 #include <arpa/inet.h>
-#include <unistd.h>
-#include <fcntl.h>
+#include <sys/poll.h>
 
 static constexpr const char* TAG = "K0_PeerConn";
 
-PeerConnection::PeerConnection(std::shared_ptr<Peer> peer, const InfoHash& info_hash, const PeerId& my_id)
-    : peer_(std::move(peer)), socket_fd_(-1), state_(ConnectionState::Disconnected),
+static std::string ip_to_string(uint32_t ip) {
+    struct in_addr addr;
+    addr.s_addr = ip;
+    return std::string(inet_ntoa(addr));
+}
+
+PeerConnection::PeerConnection(EventLoop& loop, std::shared_ptr<Peer> peer, 
+                               const InfoHash& info_hash, const PeerId& my_id)
+    : loop_(loop), peer_(std::move(peer)), state_(ConnectionState::Disconnected),
       my_info_hash_(info_hash), my_peer_id_(my_id) {}
 
 PeerConnection::~PeerConnection() {
     disconnect();
 }
 
+void PeerConnection::start() {
+    try {
+        std::string ip_str = ip_to_string(peer_->address.ip);
+        socket_.connect(ip_str, peer_->address.port);
+        
+        socket_.set_nonblocking(true);
+
+        std::weak_ptr<PeerConnection> weak_self = shared_from_this();
+        loop_.add(socket_.fd(), POLLIN | POLLOUT, [weak_self](int /*fd*/, uint32_t events) {
+            if (auto self = weak_self.lock())
+                self->on_socket_event(events);
+        });
+
+        Handshake   hs(my_info_hash_, my_peer_id_);
+        auto        hs_buf = hs.serialize();
+        write_buffer_.insert(write_buffer_.end(), hs_buf.begin(), hs_buf.end());
+        
+        state_ = ConnectionState::HandshakeSent;
+
+    } catch (const std::exception& e) {
+        LOG_W(TAG, "Failed to start connection: %s", e.what());
+        disconnect();
+    }
+}
+
 void PeerConnection::disconnect() {
-    if (socket_fd_ != -1) {
-        ::close(socket_fd_);
-        socket_fd_ = -1;
+    if (state_ == ConnectionState::Disconnected)
+        return;
+    
+    if (socket_.fd() != -1) {
+        loop_.remove(socket_.fd());
+        socket_.close();
     }
     state_ = ConnectionState::Disconnected;
 }
 
-void PeerConnection::send_handshake() {
-    Handshake hs(my_info_hash_, my_peer_id_);
-    auto buf = hs.serialize();
-    
-    if (::send(socket_fd_, buf.data(), buf.size(), 0) < 0) {
-        LOG_W(TAG, "Failed to send handshake");
-        disconnect();
-        return;
-    }
-    state_ = ConnectionState::HandshakeSent;
-}
-
-void PeerConnection::send_message(const PeerMessage& msg) {
+void PeerConnection::queue_message(const PeerMessage& msg) {
     if (state_ != ConnectionState::Connected)
         return;
 
     auto buf = msg.serialize();
-    if (send(socket_fd_, buf.data(), buf.size(), 0) < 0)
-        disconnect();
+    write_buffer_.insert(write_buffer_.end(), buf.begin(), buf.end());
+
+    loop_.modify(socket_.fd(), POLLIN | POLLOUT);
 }
 
-std::vector<PeerMessage> PeerConnection::receive_data() {
-    std::vector<PeerMessage> messages;
-    if (socket_fd_ == -1)
-        return messages;
+void PeerConnection::on_socket_event(uint32_t events) {
+    try {
+        if (events & POLLOUT)
+            handle_write();
+        if (events & POLLIN) 
+            handle_read();
 
-    uint8_t temp[4096];
-    ssize_t bytes_read = recv(socket_fd_, temp, sizeof(temp), 0);
-
-    if (bytes_read <= 0) {
+    } catch (const std::exception& e) {
+        LOG_W(TAG, "Connection error: %s", e.what());
         disconnect();
-        return messages;
     }
+}
 
-    read_buffer_.insert(read_buffer_.end(), temp, temp + bytes_read);
+void PeerConnection::handle_write() {
+    if (write_buffer_.empty())
+        return;
+
+    size_t sent = socket_.send(write_buffer_.data(), write_buffer_.size());
+    if (sent > 0)
+        write_buffer_.erase(write_buffer_.begin(), write_buffer_.begin() + sent);
+
+    if (write_buffer_.empty())
+        loop_.modify(socket_.fd(), POLLIN);
+}
+
+void PeerConnection::handle_read() {
+    auto data = socket_.recv(4096);
+    if (data.empty())
+        return;
+
+    read_buffer_.insert(read_buffer_.end(), data.begin(), data.end());
 
     if (state_ == ConnectionState::HandshakeSent)
-        if (!process_handshake()) return messages;
+        if (!process_handshake())
+            return;
 
     if (state_ == ConnectionState::Connected) {
         while (true) {
             ParseResult result = parse_peer_message(read_buffer_);
-            
             if (!result.complete)
                 break;
 
-            if (!result.is_keep_alive)
-                messages.push_back(std::move(result.message));
+            if (!result.is_keep_alive && message_handler_) 
+                message_handler_(shared_from_this(), std::move(result.message));
 
             read_buffer_.erase(read_buffer_.begin(), read_buffer_.begin() + result.consumed_bytes);
         }
     }
-    return messages;
 }
 
 bool PeerConnection::process_handshake() {
     if (read_buffer_.size() < Handshake::HANDSHAKE_SIZE)
         return false;
 
-    std::array<uint8_t, Handshake::HANDSHAKE_SIZE>  hs_buf;
+    std::array<uint8_t, Handshake::HANDSHAKE_SIZE> hs_buf;
     std::copy(read_buffer_.begin(), read_buffer_.begin() + Handshake::HANDSHAKE_SIZE, hs_buf.begin());
 
     try {
         Handshake peer_hs = Handshake::deserialize(hs_buf);
         
         if (peer_hs.info_hash != my_info_hash_)
-            throw TrackerError("InfoHash mismatch - peer is confused");
+            throw NetError("InfoHash mismatch - peer is confused");
 
         peer_->id = peer_hs.peer_id;
         peer_->id_set = true;
         state_ = ConnectionState::Connected;
         
-        LOG_I(TAG, "Handshake successful!");
+        LOG_I(TAG, "Handshake successful with peer!");
 
         read_buffer_.erase(read_buffer_.begin(), read_buffer_.begin() + Handshake::HANDSHAKE_SIZE);
         return true;
 
     } catch (const std::exception& e) {
-        LOG_W(TAG, "Handshake failed: %s", e.what());
-        disconnect();
-        
-        return false;
+        throw NetError(std::string("Handshake failed: ") + e.what());
     }
 }

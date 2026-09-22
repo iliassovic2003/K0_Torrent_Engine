@@ -74,26 +74,23 @@ void TcpSocket::close()
     }
 }
 
-void TcpSocket::send(const std::vector<uint8_t>& data)
+size_t TcpSocket::send(const uint8_t* data, size_t size)
 {
     if (fd_ == -1)
         throw NetError("send on closed socket");
 
-    size_t sent = 0;
-    while (sent < data.size()) {
-        const ssize_t n = ::send(fd_,
-                                 data.data() + sent,
-                                 data.size()  - sent,
-                                 MSG_NOSIGNAL);
-        if (n < 0) {
-            if (errno == EINTR)
-                continue; 
-            throw NetError(errno_msg("send"));
-        }
-        if (n == 0)
-            throw NetError("send: connection closed by peer");
-        sent += static_cast<size_t>(n);
+    ssize_t n;
+    do {
+        n = ::send(fd_, data, size, MSG_NOSIGNAL);
+    } while (n < 0 && errno == EINTR);
+
+    if (n < 0) {
+        if (errno == EAGAIN || errno == EWOULDBLOCK)
+            return 0;
+        throw NetError(errno_msg("send"));
     }
+
+    return static_cast<size_t>(n);
 }
 
 std::vector<uint8_t> TcpSocket::recv(size_t max_bytes)
@@ -101,14 +98,17 @@ std::vector<uint8_t> TcpSocket::recv(size_t max_bytes)
     if (fd_ == -1)
         throw NetError("recv on closed socket");
 
-    std::vector<uint8_t>    buf(max_bytes);
-    ssize_t                 n;
+    std::vector<uint8_t> buf(max_bytes);
+    ssize_t n;
     do {
         n = ::recv(fd_, buf.data(), max_bytes, 0);
     } while (n < 0 && errno == EINTR);
 
-    if (n < 0)
+    if (n < 0) {
+        if (errno == EAGAIN || errno == EWOULDBLOCK)
+            return {};
         throw NetError(errno_msg("recv"));
+    }
 
     if (n == 0)
         throw NetError("recv: connection closed by peer");

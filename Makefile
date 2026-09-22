@@ -7,15 +7,15 @@ TEST_DIR := tests
 BIN_DIR  := bin
 
 
-CRYPTO_SRC 	:= $(SRC_DIR)/crypto/sha1.cpp \
+CRYPTO_SRC 	:= 	$(SRC_DIR)/crypto/sha1.cpp \
               	$(SRC_DIR)/crypto/peer_id.cpp
 
-TORRENT_SRC := $(SRC_DIR)/torrent/metainfo.cpp \
+TORRENT_SRC := 	$(SRC_DIR)/torrent/metainfo.cpp \
                	$(SRC_DIR)/torrent/torrent_file.cpp
 
-BENCODE_SRC := $(SRC_DIR)/bencode/bencode.cpp
+BENCODE_SRC := 	$(SRC_DIR)/bencode/bencode.cpp
 
-NET_SRC 	:= $(SRC_DIR)/net/event_loop.cpp \
+NET_SRC 	:= 	$(SRC_DIR)/net/event_loop.cpp \
            		$(SRC_DIR)/net/tcp_socket.cpp \
            		$(SRC_DIR)/net/udp_socket.cpp
 
@@ -29,7 +29,17 @@ PEER_SRC := 	$(SRC_DIR)/peer/handshake.cpp \
             	$(SRC_DIR)/peer/peer.cpp \
             	$(SRC_DIR)/peer/peer_connection.cpp
 
-all: test_sha1 test_bencode test_metainfo test_tracker test_peer_wire
+NET_SRC := 		$(SRC_DIR)/net/event_loop.cpp \
+           		$(SRC_DIR)/net/tcp_socket.cpp \
+           		$(SRC_DIR)/net/udp_socket.cpp
+
+IO_SRC := 		$(SRC_DIR)/io/file_map.cpp \
+          		$(SRC_DIR)/io/disk_manager.cpp
+
+PIECE_SRC := 	$(SRC_DIR)/piece/piece_picker.cpp \
+             	$(SRC_DIR)/piece/piece_manager.cpp
+
+all: test_sha1 test_bencode test_metainfo test_tracker test_peer_wire test_async test_io test_piece
 
 $(BIN_DIR):
 	mkdir -p $(BIN_DIR)
@@ -58,7 +68,25 @@ test_peer_wire: $(BIN_DIR)
 		-o $(BIN_DIR)/test_peer_wire $(LDFLAGS)
 	@./$(BIN_DIR)/test_peer_wire
 
+test_async: $(BIN_DIR)
+	@$(CXX) $(CXXFLAGS) $(TEST_DIR)/test_async.cpp \
+		$(PEER_SRC) $(NET_SRC) $(CRYPTO_SRC) \
+		-o $(BIN_DIR)/test_async $(LDFLAGS)
+	@./$(BIN_DIR)/test_async
+
+test_io: $(BIN_DIR)
+	@$(CXX) $(CXXFLAGS) $(TEST_DIR)/test_io.cpp \
+		$(IO_SRC) \
+		-o $(BIN_DIR)/test_io $(LDFLAGS)
+	@./$(BIN_DIR)/test_io
+
+test_piece: $(BIN_DIR)
+	@$(CXX) $(CXXFLAGS) $(TEST_DIR)/test_piece_manager.cpp \
+		$(PIECE_SRC) $(CRYPTO_SRC) $(PEER_SRC) $(NET_SRC) \
+		-o $(BIN_DIR)/test_piece $(LDFLAGS)
+	@./$(BIN_DIR)/test_piece
+
 clean:
 	@rm -rf $(BIN_DIR)
 
-.PHONY: all clean test_sha1 test_bencode test_metainfo test_tracker test_peer_wire
+.PHONY: all clean test_sha1 test_bencode test_metainfo test_tracker test_peer_wire test_async test_io test_piece
