@@ -4,7 +4,7 @@
 #include "../../include/common/error.hpp"
 #include "../../include/common/logger.hpp"
 
-static constexpr const char* TAG = "K0_0TrackerMgr";
+static constexpr const char* TAG = "K0_TrackerMgr";
 
 using Clock = std::chrono::steady_clock;
 

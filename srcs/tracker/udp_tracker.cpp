@@ -2,7 +2,7 @@
 #include "../../include/common/error.hpp"
 #include "../../include/common/logger.hpp"
 
-static constexpr const char* TAG = "K0_0UdpTracker";
+static constexpr const char* TAG = "K0_UdpTracker";
 
 // BEP 15 magic connection ID used in the initial connect request
 static constexpr uint64_t CONNECT_MAGIC = 0x41727101980ULL;

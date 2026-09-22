@@ -3,7 +3,7 @@
 #include "../../include/common/error.hpp"
 #include "../../include/common/logger.hpp"
 
-static constexpr const char* TAG = "K0_0HttpTracker";
+static constexpr const char* TAG = "K0_HttpTracker";
 
 HttpTracker::HttpTracker(std::string url, int timeout_s)
     : Tracker(std::move(url)), timeout_s_(timeout_s)
